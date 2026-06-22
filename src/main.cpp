@@ -1,6 +1,7 @@
 #include <iostream>
 #include <microinfer/tensor.hpp>
-#include <microinfer/gguf.hpp>
+#include <microinfer/gguf_header.hpp>
+#include <microinfer/tensor_info.hpp>
 #include <filesystem>
 
 int main() {
@@ -29,13 +30,21 @@ int main() {
 
 
     std::filesystem::path const file_path = "../model/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";
+    std::ifstream file(file_path, std::ios::binary);
 
-    microinfer::GGUFHeader gguf_header = microinfer::read_header(file_path);
+    if(!file) throw std::runtime_error("Failed to open file");
+
+    microinfer::GGUFHeader gguf_header = microinfer::read_header(file);
 
     std::cout << "GGUF contents:\n";
     std::cout << "version: " << gguf_header.version << "\n";
     std::cout << "Tensor count: " << gguf_header.tensor_count << "\n";
     std::cout << "Metadata kv count: " << gguf_header.metadata_kv_count << "\n";
+
+    microinfer::read_metadata(file, gguf_header.metadata_kv_count);
+
+
+
 
 
 
@@ -46,6 +55,6 @@ int main() {
 
 
 
-
+    file.close();
     return 0;
 }

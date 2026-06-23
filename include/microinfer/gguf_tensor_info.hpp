@@ -3,9 +3,14 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <variant>
+#include <memory>
 
 namespace microinfer
 {
+
+    
+    
 
     enum gguf_metadata_value_type : uint32_t
     {
@@ -38,9 +43,17 @@ namespace microinfer
         bool,
         std::string>;
 
-    using meta_data_value = std::variant<
-        meta_data_type,
-        std::vector<meta_data_type>>;
+    struct meta_data_value;
+
+    using meta_data_array = std::vector<meta_data_value>;
+
+    struct meta_data_value
+    {
+        std::variant<
+            meta_data_type,
+            std::unique_ptr<meta_data_array>>
+            value;
+    };
 
     template <typename T>
     T read_type(std::ifstream &file)
@@ -59,74 +72,99 @@ namespace microinfer
         return str;
     }
 
-    void read_metadata_array(std::ifstream &file)
+    meta_data_value parse_value(std::ifstream &, gguf_metadata_value_type);
+
+    meta_data_array read_metadata_array(std::ifstream &file)
     {
-        uint64_t key_length;
+        uint32_t type_indentifier;
+        file.read(reinterpret_cast<char *>(&type_indentifier), sizeof(type_indentifier));
+        gguf_metadata_value_type array_data_type{type_indentifier};
+
+        uint64_t array_size;
+        file.read(reinterpret_cast<char *>(&array_size), sizeof(array_size));
+
+        meta_data_array data;
+
+        std::cout << array_size <<std::endl;
+
+
+        for (size_t i = 0; i < array_size; i++)
+        {
+            data.push_back(parse_value(file, array_data_type));
+        }
+
+        return data;
     }
 
     meta_data_value parse_value(std::ifstream &file, gguf_metadata_value_type type)
     {
+        meta_data_value key;
 
-        meta_data_value value;
         switch (type)
         {
         case GGUF_METADATA_VALUE_TYPE_UINT8:
-            value = read_type<uint8_t>(file);
+            key.value = read_type<uint8_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_INT8:
-            value = read_type<int8_t>(file);
+            key.value = read_type<int8_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_UINT16:
-            value = read_type<uint16_t>(file);
+            key.value = read_type<uint16_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_INT16:
-            value = read_type<int16_t>(file);
+            key.value = read_type<int16_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_UINT32:
-            value = read_type<uint32_t>(file);
+            key.value = read_type<uint32_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_INT32:
-            value = read_type<int32_t>(file);
+            key.value = read_type<int32_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_UINT64:
-            value = read_type<uint64_t>(file);
+            key.value = read_type<uint64_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_INT64:
-            value = read_type<int64_t>(file);
+            key.value = read_type<int64_t>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_FLOAT32:
-            value = read_type<float>(file);
+            key.value = read_type<float>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_FLOAT64:
-            value = read_type<double>(file);
+            key.value = read_type<double>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_BOOL:
-            value = read_type<bool>(file);
+            key.value = read_type<bool>(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_STRING:
-            value = read_string(file);
+            key.value = read_string(file);
             break;
 
         case GGUF_METADATA_VALUE_TYPE_ARRAY:
-
+        {
+            auto array = read_metadata_array(file);
+            key.value = std::make_unique<meta_data_array>(std::move(array));
             break;
+        }
 
         default:
-            throw std::runtime_error("Unknown GGUF metadata value type");
+            throw std::runtime_error("Unknown metadata value type");
         }
-        return value;
+
+        return key;
     }
+
+    
 
     void read_metadata(std::ifstream &file, int metadata_kv_count)
     {
@@ -154,7 +192,6 @@ namespace microinfer
                 {
                     using checkDataType = std::decay_t<decltype(data)>;
 
-                    
                     if constexpr (std::is_same_v<checkDataType, meta_data_type>)
                     {
                         std::visit(
@@ -164,12 +201,38 @@ namespace microinfer
                             },
                             data);
                     }
-                    else
+                    else if constexpr (std::is_same_v<checkDataType, std::unique_ptr<meta_data_array>>)
                     {
-                        std::cout << "not implemented";
+                        std::cout << "[";
+
+                        for (auto const &element : *data)
+                        {
+                            std::visit(
+                                [](const auto &value)
+                                {
+                                    using element_type = std::decay_t<decltype(value)>;
+
+                                    if constexpr (std::is_same_v<element_type, meta_data_type>)
+                                    {
+                                        std::visit(
+                                            [](auto const &primitive)
+                                            {
+                                                std::cout << primitive << " ";
+                                            },
+                                            value);
+                                    }
+                                    else
+                                    {
+                                        std::cout << "nested array";
+                                    }
+                                },
+                                element.value);
+                        }
+
+                        std::cout << "]";
                     }
                 },
-                value);
+                value.value);
 
             std::cout << '\n';
         }

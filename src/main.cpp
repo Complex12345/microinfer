@@ -1,7 +1,7 @@
 #include <iostream>
 #include <microinfer/tensor.hpp>
 #include <microinfer/gguf_header.hpp>
-#include <microinfer/tensor_info.hpp>
+#include <microinfer/gguf_tensor_info.hpp>
 #include <filesystem>
 
 int main() {

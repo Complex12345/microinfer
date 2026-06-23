@@ -85,8 +85,7 @@ namespace microinfer
 
         meta_data_array data;
 
-        std::cout << array_size <<std::endl;
-
+        // std::cout << array_size << "\n";
 
         for (size_t i = 0; i < array_size; i++)
         {

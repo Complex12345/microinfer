@@ -1,8 +1,9 @@
 #include <iostream>
 #include <microinfer/tensor.hpp>
 #include <microinfer/gguf_header.hpp>
-#include <microinfer/gguf_tensor_info.hpp>
+#include <microinfer/gguf_metadata_info.hpp>
 #include <filesystem>
+#include <chrono>
 
 int main() {
     // microinfer::Tensor<float> A(4);
@@ -37,7 +38,13 @@ int main() {
     std::cout << "Tensor count: " << gguf_header.tensor_count << "\n";
     std::cout << "Metadata kv count: " << gguf_header.metadata_kv_count << "\n";
 
-    microinfer::read_metadata(file, gguf_header.metadata_kv_count);
+    std::unordered_map<std::string, microinfer::meta_data_value> map = microinfer::read_metadata(file, gguf_header.metadata_kv_count);
+
+    std::cout << "Metadata keys: " << gguf_header.metadata_kv_count << "\n";
+
+    for(auto const& [key, val] : map) {
+        std::cout << key << "\n";
+    }
 
 
 
